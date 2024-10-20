@@ -1,5 +1,6 @@
 import os
 import torch
+import onnx
 import torchvision
 from torch.autograd import Variable
 import torch.nn as nn
@@ -13,6 +14,7 @@ import torchvision.transforms as standard_transforms
 import numpy as np
 import glob
 import os
+import time
 
 from data_loader import Rescale
 from data_loader import RescaleT
@@ -26,7 +28,7 @@ from model import U2NETP
 
 # ------- 1. define loss function --------
 
-bce_loss = nn.BCELoss(size_average=True)
+bce_loss = nn.BCELoss(reduction='mean')
 
 def muti_bce_loss_fusion(d0, d1, d2, d3, d4, d5, d6, labels_v):
 
@@ -39,25 +41,24 @@ def muti_bce_loss_fusion(d0, d1, d2, d3, d4, d5, d6, labels_v):
 	loss6 = bce_loss(d6,labels_v)
 
 	loss = loss0 + loss1 + loss2 + loss3 + loss4 + loss5 + loss6
-	print("l0: %3f, l1: %3f, l2: %3f, l3: %3f, l4: %3f, l5: %3f, l6: %3f\n"%(loss0.data.item(),loss1.data.item(),loss2.data.item(),loss3.data.item(),loss4.data.item(),loss5.data.item(),loss6.data.item()))
+# 	print("l0: %3f, l1: %3f, l2: %3f, l3: %3f, l4: %3f, l5: %3f, l6: %3f"%(loss0.data.item(),loss1.data.item(),loss2.data.item(),loss3.data.item(),loss4.data.item(),loss5.data.item(),loss6.data.item()))
 
 	return loss0, loss
 
 
 # ------- 2. set the directory of training dataset --------
-
 model_name = 'u2net' #'u2netp'
 
-data_dir = os.path.join(os.getcwd(), 'train_data' + os.sep)
-tra_image_dir = os.path.join('DUTS', 'DUTS-TR', 'DUTS-TR', 'im_aug' + os.sep)
-tra_label_dir = os.path.join('DUTS', 'DUTS-TR', 'DUTS-TR', 'gt_aug' + os.sep)
+data_dir = './train_data/'
+tra_image_dir = 'images/'
+tra_label_dir = 'masks/'
 
 image_ext = '.jpg'
 label_ext = '.png'
 
 model_dir = os.path.join(os.getcwd(), 'saved_models', model_name + os.sep)
 
-epoch_num = 100000
+epoch_num = 1
 batch_size_train = 12
 batch_size_val = 1
 train_num = 0
@@ -113,7 +114,7 @@ ite_num = 0
 running_loss = 0.0
 running_tar_loss = 0.0
 ite_num4val = 0
-save_frq = 2000 # save the model every 2000 iterations
+save_frq = 3 # save the model every n iterations
 
 for epoch in range(0, epoch_num):
     net.train()
@@ -151,12 +152,19 @@ for epoch in range(0, epoch_num):
         # del temporary outputs and loss
         del d0, d1, d2, d3, d4, d5, d6, loss2, loss
 
-        print("[epoch: %3d/%3d, batch: %5d/%5d, ite: %d] train loss: %3f, tar: %3f " % (
+        print("[epoch: %3d/%3d, batch: %5d/%5d, ite: %d] train loss: %3f, tar: %3f" % (
         epoch + 1, epoch_num, (i + 1) * batch_size_train, train_num, ite_num, running_loss / ite_num4val, running_tar_loss / ite_num4val))
 
         if ite_num % save_frq == 0:
+            timestamp = int(time.time())
+            filePath = model_dir + model_name+"_%d_%d." % (ite_num, timestamp)
 
-            torch.save(net.state_dict(), model_dir + model_name+"_bce_itr_%d_train_%3f_tar_%3f.pth" % (ite_num, running_loss / ite_num4val, running_tar_loss / ite_num4val))
+            torch.save(net.state_dict(), filePath + 'pth')
+
+            dummy_input = torch.randn(1, 3, 320, 320)
+            net.eval()
+            torch.onnx.export(net, dummy_input, filePath + 'onnx', opset_version=12)
+
             running_loss = 0.0
             running_tar_loss = 0.0
             net.train()  # resume train
