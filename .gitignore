@@ -1,0 +1,4 @@
+saved_models/u2net/
+saved_models/u2net_test/
+saved_models/train_data/images/
+saved_models/train_data/masks/
