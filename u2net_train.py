@@ -58,9 +58,9 @@ label_ext = '.png'
 
 model_dir = os.path.join(os.getcwd(), 'saved_models', model_name + os.sep)
 
-epoch_num = 1
-batch_size_train = 12
-batch_size_val = 1
+epoch_num = 1000
+batch_size_train = 16
+batch_size_val = 16
 train_num = 0
 val_num = 0
 
@@ -114,7 +114,7 @@ ite_num = 0
 running_loss = 0.0
 running_tar_loss = 0.0
 ite_num4val = 0
-save_frq = 3 # save the model every n iterations
+save_frq = 350 # save the model every n iterations
 
 for epoch in range(0, epoch_num):
     net.train()
@@ -157,14 +157,8 @@ for epoch in range(0, epoch_num):
 
         if ite_num % save_frq == 0:
             timestamp = int(time.time())
-            filePath = model_dir + model_name+"_%d_%d." % (ite_num, timestamp)
-
-            torch.save(net.state_dict(), filePath + 'pth')
-
-            dummy_input = torch.randn(1, 3, 320, 320)
-            net.eval()
-            torch.onnx.export(net, dummy_input, filePath + 'onnx', opset_version=12)
-
+            filePath = model_dir + model_name+"_%d_%d.pth" % (epoch, timestamp)
+            torch.save(net.state_dict(), filePath)
             running_loss = 0.0
             running_tar_loss = 0.0
             net.train()  # resume train
